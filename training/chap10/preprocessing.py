@@ -65,3 +65,37 @@ def create_dataset(sequences, vocab):
     sequences = vocab.encode(sequences)
     sequences = pad_sequences(sequences, padding='post')
     return sequences
+
+def convert_examples_to_features(x, y, vocab, max_seq_length, tokenizer):
+    pad_token = 0
+    features = {
+        'input_ids': [],
+        'attention_mask': [],
+        'token_type_ids': [],
+        'label_ids': [],
+    }
+    for words, labels in  zip(x, y):
+        tokens = [tokenizer.cls_token]
+        label_ids = [pad_token]
+        for word, label in zip(words, labels):
+            word_tokens = tokenizer.tokenize(word)
+            tokens.extend(word_tokens)
+            label_id = vocab.get_index(label)
+            label_ids.extend([label_id] + [pad_token] * (len(word_tokens) - 1))
+        tokens += [tokenizer.sep_token]
+        
+        input_ids = tokenizer.convert_tokens_to_ids(tokens)
+        attention_mask = [1] * len(input_ids)
+        token_type_ids = [pad_token] * max_seq_length
+        
+        features['input_ids'].append(input_ids)
+        features['attention_mask'].append(attention_mask)
+        features['token_type_ids'].append(token_type_ids)
+        features['label_ids'].append(label_ids)
+        
+    for name in features:
+        features[name] = pad_sequences(features[name], padding='post', maxlen=max_seq_length)
+        
+    x = [features['input_ids'], features['attension_mask'], features['token_type_ids']]
+    y = features['label_ids']
+    return x, y

@@ -1,7 +1,9 @@
+import tensorflow as tf 
 from tensorflow.keras.models import Model 
 from tensorflow.keras.layers import Dense, Input, Embedding, LSTM 
 from tensorflow.keras.layers import Bidirectional
 
+from transformers import TFBertForTokenClassification, BertConfig
 
 class UnidirectionalModel:
     
@@ -45,3 +47,30 @@ class BidirectionalModel:
         lstm = self.bilstm(embedding)
         y = self.fc(lstm)
         return Model(inputs=x, outputs=y)
+    
+def build_model(pretrained_model_name_or_path, num_labels):
+    config = BertConfig.from_pertrained(
+        pretrained_model_name_or_path,
+        num_labels=num_labels
+    )
+    model = TFBertForTokenClassification.from_pretrained(
+        pretrained_model_name_or_path,
+        config=config
+    )
+    model.layers[-1].activation = tf.keras.activations.softmax
+    return model 
+
+def loss_func(num_labels):
+    loss_fct = tf.keras.losses.SparseCategoricalCrossentropy(reduction = tf.keras.losses.Reduction.NONE)
+    
+    def loss(y_true, y_pred):
+        pad_token = 0 
+        input_mask      = tf.not_equal(y_true, pad_token)
+        logits          = tf.reshape(y_pred, (-1, num_labels))
+        active_loss     = tf.reshape(input_mask, (-1,))
+        active_logits   = tf.boolean_mask(logits, active_loss)
+        train_labels    = tf.reshape(y_true, (-1,))
+        active_labels   = tf.boolean_mask(train_labels, active_loss)
+        cross_entropy   = loss_fct(active_labels, active_logits)
+        return cross_entropy
+    return loss
